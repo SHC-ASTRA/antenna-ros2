@@ -1,44 +1,99 @@
-
 {
+  description = "Development environment for ASTRA tracking antenna";
+
   inputs = {
     nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";  # IMPORTANT!!!
+    astra-msgs.url = 
+      "github:SHC-ASTRA/astra_msgs/a0ee5ccea11cee2d57d366a8986cd2aba18e51ed";
   };
-  outputs = { self, nix-ros-overlay, nixpkgs }:
-    nix-ros-overlay.inputs.flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    { self, nix-ros-overlay, nixpkgs, astra-msgs }:
+    nix-ros-overlay.inputs.flake-utils.lib.eachDefaultSystem (
+      system:
       let
-        applyDistroOverlay =
-          rosOverlay: rosPackages:
-          rosPackages
-          // builtins.mapAttrs (
-            rosDistro: rosPkgs: if rosPkgs ? overrideScope then rosPkgs.overrideScope rosOverlay else rosPkgs
-          ) rosPackages;
-        rosDistroOverlays = final: prev: {
-          # Apply the overlay to multiple ROS distributions
-          rosPackages = applyDistroOverlay (import ./overlay.nix) prev.rosPackages;
-        };
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            nix-ros-overlay.overlays.default
-            rosDistroOverlays
-          ];
+          overlays = [ nix-ros-overlay.overlays.default ];
         };
 
+        astra_msgs_pkgs = astra-msgs.packages.${system};
         rosDistro = "humble";
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          name = "ASTRA Anchor";
 
-      in {
-        legacyPackages = pkgs.rosPackages;
-        packages = builtins.intersectAttrs (import ./overlay.nix null null) pkgs.rosPackages.${rosDistro};
-        checks = builtins.intersectAttrs (import ./overlay.nix null null) pkgs.rosPackages.${rosDistro};
-        devShells.default = import ./shell.nix {
-          inherit pkgs rosDistro;
-          extraPkgs = { };
-          extraPaths = [ ];
+          packages = with pkgs; [
+            colcon
+            astra_msgs_pkgs.astra-msgs
+
+            (pkgs.rosPackages.${rosDistro}.python3.withPackages (p: with p; [
+              pyserial
+              pygame
+              scipy
+              crccheck
+              black
+            ]))
+
+            (with rosPackages.${rosDistro};
+              buildEnv {
+                paths = [
+                  ros-core
+                  rqt-graph
+                  ros2cli
+                  ros2run
+                  ros2bag
+                  rviz2
+                  xacro
+                  ament-cmake-core
+                  python-cmake-module
+                  diff-drive-controller
+                  parameter-traits
+                  generate-parameter-library
+                  joint-state-publisher-gui
+                  robot-state-publisher
+                  ros2-control
+                  controller-manager
+                  control-msgs
+                  control-toolbox
+                  moveit-core
+                  moveit-planners
+                  moveit-common
+                  moveit-msgs
+                  moveit-ros-planning
+                  moveit-ros-planning-interface
+                  moveit-ros-visualization
+                  moveit-configs-utils
+                  moveit-ros-move-group
+                  moveit-servo
+                  moveit-simple-controller-manager
+                  topic-based-ros2-control
+                  pilz-industrial-motion-planner
+                  pick-ik
+                  ompl
+                  joy
+                  ros2-controllers
+                  chomp-motion-planner
+                ];
+              })
+          ];
+
+          env = {
+            ASTRAMSGS = "${astra-msgs.outPath}";
+          };
+
+          shellHook = ''
+            export DISPLAY=''${DISPLAY:-:0}
+            export QT_X11_NO_MITSHM=1
+          '';
         };
-      });
+      }
+    );
+
   nixConfig = {
     extra-substituters = [ "https://ros.cachix.org" ];
-    extra-trusted-public-keys = [ "ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=" ];
+    extra-trusted-public-keys =
+      [ "ros.cachix.org-1:dSyZxI8geDCJrwgvCOHDoAfOm5sV1wCPjBkKL+38Rvo=" ];
   };
 }
