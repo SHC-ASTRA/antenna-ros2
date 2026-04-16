@@ -18,12 +18,21 @@ serial_pub = None
 thread = None
 
 class AntennaNode(Node):
+    # Command constants from AntennaControl message
+    FOLLOW_CORE = 0
+    REQUEST_ANGLE = 1
+    RECENTER = 2
+    STOP = 3
 
     serial: Serial
 
     def __init__(self):
         # Initialize node
         super().__init__("tracking_antenna")
+
+        self.is_following_coregps = True
+        self.antenna_lat = None
+        self.antenna_long = None
 
         # Topics
 
@@ -87,35 +96,62 @@ class AntennaNode(Node):
         except KeyboardInterrupt:
             pass
 
-    def send_gps_callback(self, msg: String):
-        print("todo")
+    def send_gps_callback(self, msg: NavSatFix):
+        if self.is_following_corefeedback:
+            # todo maddy
+            # you can use self.antenna_lat and self.antenna_long
+            # as well as msg.latitude and msg.longitude for the current gps of the rover
+            # this function gets called every time there is a new NavSatFix message published
+            # i set it to None by default so maybe include error handling
+            requested_angle = 0
+            self.serial.write(f"angle,{requested_angle}\n".encode("utf8"))
 
-    def from_base_callback(self, msg: String):
-        print("todo")
+
+    def from_base_callback(self, msg: AntennaControl):
+        if msg.command == self.FOLLOW_CORE:
+            self.is_following_corefeedback = True
+            self.get_logger().info("Command: FOLLOW_CORE")
+        elif msg.command == self.REQUEST_ANGLE:
+            self.is_following_corefeedback = False
+            self.serial.write(f"angle,{msg.angle}\n".encode("utf8"))
+            self.get_logger().info(f"Command: REQUEST_ANGLE -> {msg.angle}")
+        elif msg.command == self.RECENTER:
+            self.is_following_corefeedback = False
+            self.serial.write(b"recenter\n")
+            self.get_logger().info("Command: RECENTER")
+        elif msg.command == self.STOP:
+            self.is_following_corefeedback = False
+            self.serial.write(b"stop\n")
+            self.get_logger().info("Command: STOP")
+        else:
+            self.get_logger().warn(f"Unknown command: {msg.command}")
 
     def process_mcu(self):
         message = self.serial.read_until(bytes("\n", "utf8")).decode("utf-8")
         self.get_logger().info(message)
-        # message_lst = message.split(",")
-        #
-        # feedback = AntennaFeedback(
-        #     gps_latitude=float(message_lst[0]),
-        #     gps_longitude=float(message_lst[1]),
-        #     gps_satellites=int(message_lst[2]),
-        #     gps_altitude=float(message_lst[3]),
-        #     gyro=[
-        #         float(message_lst[4]),
-        #         float(message_lst[5]),
-        #         float(message_lst[6])
-        #     ],
-        #     degrees_from_north=float(message_lst[7]),
-        #     calibration=[
-        #         int(1),
-        #         int(2),
-        #         int(3),
-        #         int(4),
-        #     ]
-        # )
+        message_lst = message.split(",")
+
+        self.antenna_lat = message_lst[0]
+        self.antenna_long = message_lst[1]
+
+        feedback = AntennaFeedback(
+            # gps_latitude=float(message_lst[0]),
+            # gps_longitude=float(message_lst[1]),
+            gps_satellites=int(message_lst[2]),
+            # gps_altitude=float(message_lst[3]),
+            gyro=[
+                float(message_lst[4]),
+                float(message_lst[5]),
+                float(message_lst[6])
+            ],
+            degrees_from_north=float(message_lst[7]),
+            calibration=[
+                int(1),
+                int(2),
+                int(3),
+                int(4),
+            ]
+        )
 
     def base_feedback(self):
         pass

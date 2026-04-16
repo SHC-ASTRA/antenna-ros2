@@ -2,10 +2,10 @@
   description = "Development environment for ASTRA tracking antenna";
 
   inputs = {
-    nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/master";
+    nix-ros-overlay.url = "github:lopsided98/nix-ros-overlay/develop";
     nixpkgs.follows = "nix-ros-overlay/nixpkgs";  # IMPORTANT!!!
     astra-msgs.url = 
-      "github:SHC-ASTRA/astra_msgs/a0ee5ccea11cee2d57d366a8986cd2aba18e51ed";
+      "github:SHC-ASTRA/astra_msgs/54f5b1df85844559d4c73a55b0547933e789f625";
   };
   outputs =
     { self, nix-ros-overlay, nixpkgs, astra-msgs }:

@@ -10,17 +10,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1774759473,
-        "narHash": "sha256-vlYapPdDUiko6vkNLrbF1Y22nXpdpDw5kbAQPmY28uM=",
+        "lastModified": 1776322696,
+        "narHash": "sha256-n+V3wgK7VZ2OFYdlRgFTTq8wVlMOEbX4TC4D1FXV7gI=",
         "owner": "SHC-ASTRA",
         "repo": "astra_msgs",
-        "rev": "a0ee5ccea11cee2d57d366a8986cd2aba18e51ed",
+        "rev": "54f5b1df85844559d4c73a55b0547933e789f625",
         "type": "github"
       },
       "original": {
         "owner": "SHC-ASTRA",
         "repo": "astra_msgs",
-        "rev": "a0ee5ccea11cee2d57d366a8986cd2aba18e51ed",
+        "rev": "54f5b1df85844559d4c73a55b0547933e789f625",
         "type": "github"
       }
     },
@@ -86,16 +86,16 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1760253751,
-        "narHash": "sha256-tqONCEDnJ82YdMa5RJz/nOLlOrP3faDqhxh/A/F1JhU=",
+        "lastModified": 1774740601,
+        "narHash": "sha256-vnxPgJQVbP1EjT/GztgU3CyTjwcX/OO4DmuPF0Xk4Ns=",
         "owner": "lopsided98",
         "repo": "nix-ros-overlay",
-        "rev": "2d5295bbc2b69bda8fd741340900af912509937f",
+        "rev": "88c65265caae81150d05d2dc53127218d1c35eb4",
         "type": "github"
       },
       "original": {
         "owner": "lopsided98",
-        "ref": "master",
+        "ref": "develop",
         "repo": "nix-ros-overlay",
         "type": "github"
       }
@@ -118,11 +118,11 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1744849697,
-        "narHash": "sha256-S9hqvanPSeRu6R4cw0OhvH1rJ+4/s9xIban9C4ocM/0=",
-        "owner": "lopsided98",
+        "lastModified": 1759381078,
+        "narHash": "sha256-gTrEEp5gEspIcCOx9PD8kMaF1iEmfBcTbO0Jag2QhQs=",
+        "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "6318f538166fef9f5118d8d78b9b43a04bb049e4",
+        "rev": "7df7ff7d8e00218376575f0acdcc5d66741351ee",
         "type": "github"
       },
       "original": {
