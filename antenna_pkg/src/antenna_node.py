@@ -103,7 +103,21 @@ class AntennaNode(Node):
             # as well as msg.latitude and msg.longitude for the current gps of the rover
             # this function gets called every time there is a new NavSatFix message published
             # i set it to None by default so maybe include error handling
-            requested_angle = 0
+
+            # Calculating the heading
+            self.antenna_lat = math.radians(self.antenna_lat)
+            self.antenna_long = math.radians(self.antenna_long)
+            msg.lattitude = math.radians(msg.lattitude)
+            msg.longitude = math.radians(msg.longitude)
+            x = math.cos(msg.lattitude) * math.sin((msg.longitude-self.antenna.long))
+            y = math.cos(self.antenna_lat) * math.sin(msg.lattitude) - math.sin(msg.lattitude) * math.cos(msg.lattitude) * math.cos((msg.longitude-self.antenna_long))
+
+            requested_angle = clamp_angle(int(math.atan2(x,y) * 180.0/math.pi))
+            if requested_angle >170:
+                requested_angle = 170
+            elif requested_angle <-170:
+                requested_angle = -170
+
             self.serial.write(f"angle,{requested_angle}\n".encode("utf8"))
 
 
@@ -155,6 +169,14 @@ class AntennaNode(Node):
 
     def base_feedback(self):
         pass
+
+def clamp_angle(x: float):
+    x = x%360.0
+    if x < 0.0:
+        x += 360
+    if x> 180.0:
+        x -=360
+    return x
 
 
 def clamp_short(x: int) -> int:
