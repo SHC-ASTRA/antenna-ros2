@@ -7,6 +7,7 @@ from serial import Serial
 from os import getenv
 from time import sleep
 import atexit
+import math
 
 import rclpy
 from rclpy.node import Node
@@ -37,7 +38,9 @@ class AntennaNode(Node):
         # Topics
 
         self.rover_gps_sub = self.create_subscription(
-            NavSatFix, "/core/gps", self.send_gps_callback, 10
+            NavSatFix,
+            "/core/gps", 
+            self.send_gps_callback, 10
         )
 
         self.to_base = self.create_publisher(
