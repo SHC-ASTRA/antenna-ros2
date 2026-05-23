@@ -18,6 +18,7 @@ from sensor_msgs.msg import NavSatFix
 serial_pub = None
 thread = None
 
+
 class AntennaNode(Node):
     # Command constants from AntennaControl message
     FOLLOW_CORE = 0
@@ -32,28 +33,26 @@ class AntennaNode(Node):
         super().__init__("tracking_antenna")
 
         self.is_following_coregps = True
-        self.antenna_lat = None
-        self.antenna_long = None
+        self.antenna_lat = 0
+        self.antenna_long = 0
 
         # Topics
 
         self.rover_gps_sub = self.create_subscription(
-            NavSatFix,
-            "/core/gps", 
-            self.send_gps_callback, 10
+            NavSatFix, "/core/gps", self.send_gps_callback, 10
         )
 
-        self.to_base = self.create_publisher(
-            AntennaFeedback,
-            "/antenna/to_base",
-            10
-        )
+        self.to_base = self.create_publisher(AntennaFeedback, "/antenna/to_base", 10)
         self.from_base = self.create_subscription(
             AntennaControl,
             "/antenna/from_base",
             self.from_base_callback,
             10,
         )
+
+        self.antenna_feedback = AntennaFeedback()
+
+        self.feedback_timer = self.create_timer(1.0, self.publish_antenna_feedback)
 
         # setting up mcu
         self.port: str | None = getenv("PORT_OVERRIDE")
@@ -64,9 +63,10 @@ class AntennaNode(Node):
 
             for port in glob("/dev/ttyUSB*") + glob("/dev/ttyACM*"):
                 try:
-                    ser = Serial(port, 115200, timeout=1)
+                    ser = Serial(port, 115200, timeout=2)
                     ser.write(b"ping\n")
                     result = ser.read_until(bytes("\n", "utf8"))
+                    self.get_logger().info(result)
 
                     # if we didn't get a pong back, we aren't talking to the right thing
                     if b"pong" not in result:
@@ -85,7 +85,6 @@ class AntennaNode(Node):
         self.serial = Serial(self.port, 115200)
 
         # atexit.register(self.cleanup)
-
 
     def run(self):
         global thread
@@ -108,21 +107,22 @@ class AntennaNode(Node):
             # i set it to None by default so maybe include error handling
 
             # Calculating the heading
-            self.antenna_lat = math.radians(self.antenna_lat)
-            self.antenna_long = math.radians(self.antenna_long)
-            msg.lattitude = math.radians(msg.lattitude)
+            self.antenna_lat = math.radians(float(self.antenna_lat))
+            self.antenna_long = math.radians(float(self.antenna_long))
+            msg.latitude = math.radians(msg.latitude)
             msg.longitude = math.radians(msg.longitude)
-            x = math.cos(msg.lattitude) * math.sin((msg.longitude-self.antenna.long))
-            y = math.cos(self.antenna_lat) * math.sin(msg.lattitude) - math.sin(msg.lattitude) * math.cos(msg.lattitude) * math.cos((msg.longitude-self.antenna_long))
+            x = math.cos(msg.latitude) * math.sin((msg.longitude - self.antenna_long))
+            y = math.cos(self.antenna_lat) * math.sin(msg.latitude) - math.sin(
+                msg.latitude
+            ) * math.cos(msg.latitude) * math.cos((msg.longitude - self.antenna_long))
 
-            requested_angle = clamp_angle(int(math.atan2(x,y) * 180.0/math.pi))
-            if requested_angle >170:
+            requested_angle = clamp_angle(int(math.atan2(x, y) * 180.0 / math.pi))
+            if requested_angle > 170:
                 requested_angle = 170
-            elif requested_angle <-170:
+            elif requested_angle < -170:
                 requested_angle = -170
 
             self.serial.write(f"angle,{requested_angle}\n".encode("utf8"))
-
 
     def from_base_callback(self, msg: AntennaControl):
         if msg.command == self.FOLLOW_CORE:
@@ -146,39 +146,43 @@ class AntennaNode(Node):
     def process_mcu(self):
         message = self.serial.read_until(bytes("\n", "utf8")).decode("utf-8")
         self.get_logger().info(message)
-        message_lst = message.split(",")
+        if "info" in message:
+            message_lst = message[5:-2].split(",")
+            # for x in message_lst:
+            #     x = float(x)
 
-        self.antenna_lat = message_lst[0]
-        self.antenna_long = message_lst[1]
+            self.antenna_lat = message_lst[0]
+            self.antenna_long = message_lst[1]
 
-        feedback = AntennaFeedback(
-            # gps_latitude=float(message_lst[0]),
-            # gps_longitude=float(message_lst[1]),
-            gps_satellites=int(message_lst[2]),
-            # gps_altitude=float(message_lst[3]),
-            gyro=[
-                float(message_lst[4]),
-                float(message_lst[5]),
-                float(message_lst[6])
-            ],
-            degrees_from_north=float(message_lst[7]),
-            calibration=[
-                int(1),
-                int(2),
-                int(3),
-                int(4),
-            ]
-        )
+            self.antenna_feedback = AntennaFeedback(
+                # gps_latitude=float(message_lst[0]),
+                # gps_longitude=float(message_lst[1]),
+                gps_satellites=int(message_lst[2]),
+                # gps_altitude=float(message_lst[3]),
+                gyro=[
+                    float(message_lst[4]),
+                    float(message_lst[5]),
+                    float(message_lst[6]),
+                ],
+                degrees_from_north=float(message_lst[7]),
+                calibration=[
+                    int(1),
+                    int(2),
+                    int(3),
+                    int(4),
+                ],
+            )
 
-    def base_feedback(self):
-        pass
+    def publish_antenna_feedback(self):
+        self.to_base.publish(self.antenna_feedback)
+
 
 def clamp_angle(x: float):
-    x = x%360.0
+    x = x % 360.0
     if x < 0.0:
         x += 360
-    if x> 180.0:
-        x -=360
+    if x > 180.0:
+        x -= 360
     return x
 
 
