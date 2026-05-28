@@ -32,7 +32,7 @@ class AntennaNode(Node):
         # Initialize node
         super().__init__("tracking_antenna")
 
-        self.is_following_coregps = True
+        self.is_following_core = True
         self.antenna_lat = 0
         self.antenna_long = 0
 
@@ -60,7 +60,6 @@ class AntennaNode(Node):
         for _ in range(4):
             if self.port is not None:
                 break
-
             for port in glob("/dev/ttyUSB*") + glob("/dev/ttyACM*"):
                 try:
                     ser = Serial(port, 115200, timeout=2)
@@ -99,23 +98,15 @@ class AntennaNode(Node):
             pass
 
     def send_gps_callback(self, msg: NavSatFix):
-        if self.is_following_corefeedback:
-            # todo maddy
-            # you can use self.antenna_lat and self.antenna_long
-            # as well as msg.latitude and msg.longitude for the current gps of the rover
-            # this function gets called every time there is a new NavSatFix message published
-            # i set it to None by default so maybe include error handling
-
-            # Calculating the heading
-            self.antenna_lat = math.radians(float(self.antenna_lat))
-            self.antenna_long = math.radians(float(self.antenna_long))
-            msg.latitude = math.radians(msg.latitude)
-            msg.longitude = math.radians(msg.longitude)
-            x = math.cos(msg.latitude) * math.sin((msg.longitude - self.antenna_long))
-            y = math.cos(self.antenna_lat) * math.sin(msg.latitude) - math.sin(
-                msg.latitude
-            ) * math.cos(msg.latitude) * math.cos((msg.longitude - self.antenna_long))
-
+        if self.is_following_core:
+            ant_lat = math.radians(float(self.antenna_lat))
+            ant_lon = math.radians(float(self.antenna_long))
+            rov_lat = math.radians(msg.latitude)
+            rov_lon = math.radians(msg.longitude)
+            x = math.cos(rov_lat) * math.sin(rov_lon - ant_lon)
+            y = math.cos(ant_lat) * math.sin(rov_lat) - math.sin(ant_lat) * math.cos(
+                rov_lat
+            ) * math.cos(rov_lon - ant_lon)
             requested_angle = clamp_angle(int(math.atan2(x, y) * 180.0 / math.pi))
             if requested_angle > 170:
                 requested_angle = 170
@@ -126,18 +117,18 @@ class AntennaNode(Node):
 
     def from_base_callback(self, msg: AntennaControl):
         if msg.command == self.FOLLOW_CORE:
-            self.is_following_corefeedback = True
+            self.is_following_core = True
             self.get_logger().info("Command: FOLLOW_CORE")
         elif msg.command == self.REQUEST_ANGLE:
-            self.is_following_corefeedback = False
+            self.is_following_core = False
             self.serial.write(f"angle,{msg.angle}\n".encode("utf8"))
             self.get_logger().info(f"Command: REQUEST_ANGLE -> {msg.angle}")
         elif msg.command == self.RECENTER:
-            self.is_following_corefeedback = False
+            self.is_following_core = False
             self.serial.write(b"recenter\n")
             self.get_logger().info("Command: RECENTER")
         elif msg.command == self.STOP:
-            self.is_following_corefeedback = False
+            self.is_following_core = False
             self.serial.write(b"stop\n")
             self.get_logger().info("Command: STOP")
         else:
@@ -147,13 +138,9 @@ class AntennaNode(Node):
         message = self.serial.read_until(bytes("\n", "utf8")).decode("utf-8")
         self.get_logger().info(message)
         if "info" in message:
-            message_lst = message[5:-2].split(",")
-            # for x in message_lst:
-            #     x = float(x)
-
-            self.antenna_lat = message_lst[0]
-            self.antenna_long = message_lst[1]
-
+            message_lst = message.strip().removeprefix("info,").split(",")
+            self.antenna_lat = int(message_lst[0]) / 1e7
+            self.antenna_long = int(message_lst[1]) / 1e7
             self.antenna_feedback = AntennaFeedback(
                 # gps_latitude=float(message_lst[0]),
                 # gps_longitude=float(message_lst[1]),
@@ -197,7 +184,6 @@ def myexcepthook(type, value, tb):
 def main(args=None):
     rclpy.init(args=args)
     sys.excepthook = myexcepthook
-
     global serial_pub
     serial_pub = AntennaNode()
     serial_pub.run()
